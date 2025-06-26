@@ -40,8 +40,9 @@ class ChatMessageContext:
 
     def check_types(self, types: list) -> bool:
         """检查消息类型"""
+        # 如果accept_format为空，表示支持所有类型
         if not self.message.message_info.format_info.accept_format:
-            return False
+            return True
         for t in types:
             if t not in self.message.message_info.format_info.accept_format:
                 return False
