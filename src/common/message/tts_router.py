@@ -66,7 +66,7 @@ class TTSRouter:
             }
 
             # 发送到TTS适配器
-            url = f"http://{self.host}:{self.port}/ws"
+            url = f"ws://{self.host}:{self.port}/ws"
             logger.debug(f"正在连接到TTS适配器: {url}")
             async with self.session.ws_connect(url) as ws:
                 await ws.send_json(tts_message)
