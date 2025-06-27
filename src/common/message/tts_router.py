@@ -107,6 +107,9 @@ class TTSRouter:
                 raw_message=text
             )
 
+            # 添加调试日志
+            logger.debug(f"TTS消息详情: platform={platform}, user_id={user_info.user_id}, group_id={group_info.group_id if group_info else 'None'}, text='{text}'")
+
             return await self.route_tts_message(message)
 
         except Exception as e:
