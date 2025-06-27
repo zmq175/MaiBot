@@ -27,22 +27,28 @@ class TTSRouter:
     async def start(self):
         """启动TTS路由器"""
         if not self.enabled:
+            logger.warning("TTS路由器未启用，跳过启动")
             return
             
         try:
+            logger.debug("正在创建 aiohttp ClientSession...")
             self.session = aiohttp.ClientSession()
             logger.info("TTS路由器已启动")
+            logger.debug(f"TTS路由器状态: enabled={self.enabled}, session={self.session is not None}")
         except Exception as e:
             logger.error(f"启动TTS路由器失败: {e}")
+            self.session = None
 
     async def stop(self):
         """停止TTS路由器"""
         if self.session:
             await self.session.close()
+            self.session = None
             logger.info("TTS路由器已停止")
 
     async def route_tts_message(self, message: MessageBase) -> bool:
         """路由TTS消息到TTS适配器"""
+        logger.debug(f"TTS路由器状态检查: enabled={self.enabled}, session={self.session is not None}")
         if not self.enabled or not self.session:
             logger.warning("TTS路由器未启用或会话未创建")
             return False
@@ -61,6 +67,7 @@ class TTSRouter:
 
             # 发送到TTS适配器
             url = f"http://{self.host}:{self.port}/ws"
+            logger.debug(f"正在连接到TTS适配器: {url}")
             async with self.session.ws_connect(url) as ws:
                 await ws.send_json(tts_message)
                 logger.info(f"TTS消息已发送到适配器: {message.message_segment.data[:50]}...")
@@ -73,6 +80,7 @@ class TTSRouter:
     async def route_tts_text(self, text: str, platform: str, user_info: UserInfo, 
                            group_info: Optional[GroupInfo] = None) -> bool:
         """直接路由TTS文本到TTS适配器"""
+        logger.debug(f"TTS路由器状态检查: enabled={self.enabled}, session={self.session is not None}")
         if not self.enabled or not self.session:
             logger.warning("TTS路由器未启用或会话未创建")
             return False
