@@ -15,6 +15,7 @@ from src.main import MainSystem
 from rich.traceback import install
 
 from src.manager.async_task_manager import async_task_manager
+from src.common.message.tts_router import tts_router
 
 install(extra_lines=3)
 
@@ -231,6 +232,9 @@ if __name__ == "__main__":
         asyncio.set_event_loop(loop)
 
         try:
+            # 启动TTS路由器
+            loop.run_until_complete(tts_router.start())
+            
             # 执行初始化和任务调度
             loop.run_until_complete(main_system.initialize())
             loop.run_until_complete(main_system.schedule_tasks())
@@ -258,6 +262,13 @@ if __name__ == "__main__":
         logger.error(f"主程序发生异常: {str(e)} {str(traceback.format_exc())}")
         exit_code = 1  # 标记发生错误
     finally:
+        # 停止TTS路由器
+        if "loop" in locals() and loop and not loop.is_closed():
+            try:
+                loop.run_until_complete(tts_router.stop())
+            except Exception as e:
+                logger.error(f"停止TTS路由器时发生错误: {e}")
+        
         # 确保 loop 在任何情况下都尝试关闭（如果存在且未关闭）
         if "loop" in locals() and loop and not loop.is_closed():
             loop.close()

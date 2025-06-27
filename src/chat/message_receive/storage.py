@@ -46,7 +46,7 @@ class MessageStorage:
 
             Messages.create(
                 message_id=msg_id,
-                time=float(message.message_info.time),
+                time=float(message.message_info.time) if message.message_info.time is not None else 0.0,
                 chat_id=chat_stream.stream_id,
                 # Flattened chat_info
                 chat_info_stream_id=chat_info_dict.get("stream_id"),
