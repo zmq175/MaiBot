@@ -138,6 +138,8 @@ class ActionModifier:
                 result["add"].append("exit_focus_chat")
                 result["remove"].append("no_reply")
                 result["remove"].append("reply")
+                # 在auto模式下保留tts_action和vtb_action，让它们可以继续工作
+                logger.debug(f"auto模式下保留tts_action和vtb_action，只移除reply和no_reply")
 
         # 计算连续回复的相关阈值
 

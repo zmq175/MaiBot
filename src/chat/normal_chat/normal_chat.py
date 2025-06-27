@@ -318,6 +318,9 @@ class NormalChat:
             with Timer("消息发送", timing_results):
                 first_bot_msg = await self._add_messages_to_manager(message, response_set, thinking_id)
 
+            # 检查是否需要发送TTS语音
+                await self._check_and_send_tts(message, response_set)
+
             # 检查 first_bot_msg 是否为 None (例如思考消息已被移除的情况)
             if first_bot_msg:
                 info_catcher.catch_after_response(timing_results["消息发送"], response_set, first_bot_msg)
@@ -523,3 +526,77 @@ class NormalChat:
             self.willing_amplifier = 5
         elif self.willing_amplifier < 0.1:
             self.willing_amplifier = 0.1
+
+    async def _check_and_send_tts(self, message: MessageRecv, response_set: List[str]):
+        """检查是否需要发送TTS语音"""
+        try:
+            # 获取TTS概率配置
+            tts_probability = getattr(global_config.chat, 'auto_tts_probability', 0.3)
+            normal_tts_probability = getattr(global_config.chat, 'normal_tts_probability', 0.1)
+            
+            # 根据聊天模式决定是否发送TTS
+            should_send_tts = False
+            current_probability = 0.0
+            mode = global_config.chat.chat_mode
+            logger.debug(f"[TTS] 当前聊天模式: {mode}")
+            logger.debug(f"[TTS] auto_tts_probability: {tts_probability}, normal_tts_probability: {normal_tts_probability}")
+            
+            if mode == "auto":
+                current_probability = tts_probability
+                should_send_tts = random() < current_probability
+                logger.debug(f"[TTS] auto模式, 随机值<{current_probability}: {should_send_tts}")
+            elif mode == "normal":
+                current_probability = normal_tts_probability
+                should_send_tts = random() < current_probability
+                logger.debug(f"[TTS] normal模式, 随机值<{current_probability}: {should_send_tts}")
+            else:
+                logger.debug(f"[TTS] 当前模式({mode})不支持TTS自动触发")
+            
+            if should_send_tts:
+                logger.info(f"[{self.stream_name}] {mode}模式下触发TTS，概率={current_probability}")
+                from src.plugins.tts_plgin.actions.tts_action import TTSAction
+                from src.chat.focus_chat.planners.action_manager import ActionManager
+                from src.chat.focus_chat.expressors.default_expressor import DefaultExpressor
+                from src.chat.heart_flow.observation.chatting_observation import ChattingObservation
+                
+                # 创建临时的ActionManager来执行TTS动作
+                action_manager = ActionManager()
+                
+                # 准备TTS动作数据
+                tts_text = " ".join(response_set)
+                action_data = {"text": tts_text}
+                logger.debug(f"[TTS] 发送TTS文本: {tts_text}")
+                
+                # 创建必要的内部服务
+                expressor = DefaultExpressor(self.stream_id)
+                await expressor.initialize()
+                expressor.chat_stream = self.chat_stream
+                
+                # 创建聊天观察
+                chatting_observation = ChattingObservation(self.stream_id)
+                observations = [chatting_observation]
+                
+                # 创建TTS动作实例
+                tts_action = TTSAction(
+                    action_data=action_data,
+                    reasoning=f"{mode}模式下自动发送TTS语音",
+                    cycle_timers={},
+                    thinking_id="tts_" + str(int(time.time())),
+                    observations=observations,
+                    expressor=expressor,
+                    chat_stream=self.chat_stream,
+                    log_prefix=f"[{self.stream_name}]",
+                    shutting_down=False
+                )
+                
+                # 执行TTS动作
+                success, result = await tts_action.process()
+                if success:
+                    logger.info(f"[{self.stream_name}] {mode}模式下TTS语音发送成功")
+                else:
+                    logger.warning(f"[{self.stream_name}] {mode}模式下TTS语音发送失败: {result}")
+            else:
+                logger.debug(f"[TTS] 本次未触发TTS (概率={current_probability})")
+        except Exception as e:
+            logger.error(f"[{self.stream_name}] 检查TTS时出错: {e}")
+            # 不抛出异常，避免影响正常回复流程

@@ -1,5 +1,6 @@
 from src.common.logger_manager import get_logger
 from src.chat.focus_chat.planners.actions.plugin_action import PluginAction, register_action
+from src.common.message.tts_router import tts_router
 from typing import Tuple
 
 logger = get_logger("tts_action")
@@ -38,11 +39,43 @@ class TTSAction(PluginAction):
         processed_text = self._process_text_for_tts(text)
 
         try:
-            # 发送TTS消息
-            await self.send_message(type="tts_text", data=processed_text)
+            # 获取聊天流信息
+            chat_stream = self._services.get("chat_stream")
+            if not chat_stream:
+                logger.error(f"{self.log_prefix} 无法获取聊天流信息")
+                return False, "执行TTS动作失败：无法获取聊天流信息"
 
-            logger.info(f"{self.log_prefix} TTS动作执行成功，文本长度: {len(processed_text)}")
-            return True, "TTS动作执行成功"
+            # 构建用户信息
+            from maim_message import UserInfo, GroupInfo
+            user_info = UserInfo(
+                platform=chat_stream.platform,
+                user_id=chat_stream.user_info.user_id if chat_stream.user_info else "",
+                user_nickname=chat_stream.user_info.user_nickname if chat_stream.user_info else "",
+                user_cardname=chat_stream.user_info.user_cardname if chat_stream.user_info else ""
+            )
+            
+            group_info = None
+            if chat_stream.group_info:
+                group_info = GroupInfo(
+                    platform=chat_stream.group_info.platform,
+                    group_id=chat_stream.group_info.group_id,
+                    group_name=chat_stream.group_info.group_name
+                )
+
+            # 使用TTS路由器发送消息
+            success = await tts_router.route_tts_text(
+                text=processed_text,
+                platform=chat_stream.platform,
+                user_info=user_info,
+                group_info=group_info
+            )
+
+            if success:
+                logger.info(f"{self.log_prefix} TTS动作执行成功，文本长度: {len(processed_text)}")
+                return True, "TTS动作执行成功"
+            else:
+                logger.error(f"{self.log_prefix} TTS路由器发送失败")
+                return False, "TTS动作执行失败：路由器发送失败"
 
         except Exception as e:
             logger.error(f"{self.log_prefix} 执行TTS动作时出错: {e}")

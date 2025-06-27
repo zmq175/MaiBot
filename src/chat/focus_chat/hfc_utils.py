@@ -26,11 +26,23 @@ async def create_empty_anchor_message(
         user_info=placeholder_user,
         time=time.time(),
     )
+    
+    # 设置format_info，支持所有消息类型包括tts_text和vtb_text
+    format_info = {
+        "content_format": "text,image,emoji,reply,tts_text,vtb_text,voice",
+        "accept_format": "text,image,emoji,reply,tts_text,vtb_text,voice"
+    }
+    template_info = {
+        "template_items": {},
+    }
+    
     placeholder_msg_dict = {
         "message_info": placeholder_msg_info.to_dict(),
         "processed_plain_text": "[System Trigger Context]",
         "raw_message": "",
         "time": placeholder_msg_info.time,
+        "format_info": format_info,
+        "template_info": template_info,
     }
     anchor_message = MessageRecv(placeholder_msg_dict)
     anchor_message.update_chat_stream(chat_stream)

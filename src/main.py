@@ -18,6 +18,7 @@ from .chat.message_receive.bot import chat_bot
 from .common.logger_manager import get_logger
 from .individuality.individuality import individuality, Individuality
 from .common.server import global_server, Server
+from .common.message.tts_router import tts_router
 from rich.traceback import install
 from .chat.focus_chat.expressors.exprssion_learner import expression_learner
 from .api.main import start_api_server
@@ -187,11 +188,24 @@ class MainSystem:
 
 async def main():
     """主函数"""
-    system = MainSystem()
-    await asyncio.gather(
-        system.initialize(),
-        system.schedule_tasks(),
-    )
+    try:
+        # 启动TTS路由器
+        await tts_router.start()
+        
+        system = MainSystem()
+        await asyncio.gather(
+            system.initialize(),
+            system.schedule_tasks(),
+        )
+        
+    except KeyboardInterrupt:
+        logger.info("接收到中断信号，正在关闭...")
+    except Exception as e:
+        logger.error(f"程序运行出错: {e}")
+        raise
+    finally:
+        # 停止TTS路由器
+        await tts_router.stop()
 
 
 if __name__ == "__main__":

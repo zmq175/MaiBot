@@ -111,6 +111,39 @@ class MessageRecv(Message):
         self.processed_plain_text = ""  # 初始化为空字符串
         self.detailed_plain_text = ""  # 初始化为空字符串
         self.is_emoji = False
+        
+        # 强制修正format_info，确保包含所有支持的消息类型
+        if self.message_info.format_info:
+            # 确保accept_format包含所有支持的类型
+            supported_types = ['text', 'image', 'emoji', 'reply', 'tts_text', 'vtb_text', 'voice']
+            current_accept = self.message_info.format_info.accept_format or []
+            if isinstance(current_accept, str):
+                current_accept = current_accept.split(',') if current_accept else []
+            
+            # 添加缺失的类型
+            for msg_type in supported_types:
+                if msg_type not in current_accept:
+                    current_accept.append(msg_type)
+            
+            # 确保content_format也包含所有类型
+            current_content = self.message_info.format_info.content_format or []
+            if isinstance(current_content, str):
+                current_content = current_content.split(',') if current_content else []
+            
+            for msg_type in supported_types:
+                if msg_type not in current_content:
+                    current_content.append(msg_type)
+            
+            # 更新format_info
+            from maim_message import FormatInfo
+            self.message_info.format_info = FormatInfo(
+                content_format=current_content,
+                accept_format=current_accept
+            )
+        
+        # 添加调试日志
+        logger.debug(f"MessageRecv构造函数: format_info = {self.message_info.format_info}")
+        logger.debug(f"MessageRecv构造函数: accept_format = '{self.message_info.format_info.accept_format}'")
 
     def update_chat_stream(self, chat_stream: "ChatStream"):
         self.chat_stream = chat_stream
@@ -145,6 +178,9 @@ class MessageRecv(Message):
                 if isinstance(seg.data, str):
                     return await image_manager.get_emoji_description(seg.data)
                 return "[发了一个表情包，网卡了加载不出来]"
+            elif seg.type == "voice":
+                # 处理语音消息
+                return "[语音消息]"
             else:
                 return f"[{seg.type}:{str(seg.data)}]"
         except Exception as e:
@@ -219,6 +255,9 @@ class MessageProcessBase(Message):
                 if self.reply and hasattr(self.reply, "processed_plain_text"):
                     return f"[回复：{self.reply.processed_plain_text}]"
                 return None
+            elif seg.type == "voice":
+                # 处理语音消息
+                return "[语音消息]"
             else:
                 return f"[{seg.type}:{str(seg.data)}]"
         except Exception as e:

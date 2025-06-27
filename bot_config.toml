@@ -1,0 +1,59 @@
+[chat]
+chat_mode = "auto"  # 聊天模式 —— 普通模式：normal，专注模式：focus，在普通模式和专注模式之间自动切换
+auto_tts_probability = 0.3  # auto模式下发送TTS语音的概率（0.0-1.0）
+normal_tts_probability = 0.1  # 普通模式下发送TTS语音的概率（0.0-1.0）
+
+[willing]
+willing_mode = "custom"  # 设置为自定义模式
+response_willing_amplifier = 1.0  # 回复意愿放大系数
+response_interested_rate_amplifier = 1.0  # 回复兴趣度放大系数
+down_frequency_rate = 3.0  # 降低回复频率的群组回复意愿降低系数
+emoji_response_penalty = 0.0  # 表情包回复惩罚系数
+mentioned_bot_inevitable_reply = true  # 提及bot必然回复
+at_bot_inevitable_reply = true  # @bot必然回复
+
+# 自定义模式特定配置
+[willing.custom]
+base_reply_probability = 0.3  # 基础回复概率
+min_reply_probability = 0.1   # 最小回复概率
+max_reply_probability = 0.8   # 最大回复概率
+willing_decay_rate = 0.1      # 每秒衰减率
+interest_threshold = 0.4      # 兴趣度阈值
+interest_boost = 0.2          # 兴趣度提升系数
+interest_decay = 0.05         # 兴趣度衰减系数
+emoji_penalty = 0.1           # emoji消息惩罚
+mention_boost = 0.3           # @提及提升
+keyword_boost = 0.2           # 关键词提升
+group_frequency_down = 0.5    # 群组频率降低率
+group_frequency_up = 1.2      # 群组频率提升率
+
+# 高兴趣关键词列表
+[willing.custom.keywords]
+keywords = [
+    "你好",
+    "在吗",
+    "帮忙",
+    "谢谢",
+    "请问",
+    "问题",
+    "求助",
+    "建议",
+    "推荐",
+    "介绍"
+]
+
+# 群组特定配置
+[willing.custom.groups]
+# 示例群组配置
+"123456789" = {
+    base_reply_probability = 0.4  # 更高的基础回复概率
+    min_reply_probability = 0.2   # 更高的最小回复概率
+    max_reply_probability = 0.9   # 更高的最大回复概率
+    willing_decay_rate = 0.05     # 更慢的衰减率
+    interest_threshold = 0.3      # 更低的兴趣度阈值
+    interest_boost = 0.3          # 更高的兴趣度提升
+    emoji_penalty = 0.05          # 更低的emoji惩罚
+    mention_boost = 0.4           # 更高的@提及提升
+    keyword_boost = 0.3           # 更高的关键词提升
+    group_frequency_up = 1.5      # 更高的频率提升
+} 

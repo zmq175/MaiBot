@@ -286,6 +286,10 @@ class ActionPlanner:
                     chat_target_info.get("person_name") or chat_target_info.get("user_nickname") or "对方"
                 )
                 chat_context_description = f"你正在和 {chat_target_name} 私聊"
+            
+            # 在auto模式下添加特殊提示
+            if global_config.chat.chat_mode == "auto":
+                chat_context_description += "（当前处于自动模式，你可以使用语音功能来增强交互体验）"
 
             chat_content_block = ""
             if observed_messages_str:

@@ -467,7 +467,7 @@ class HeartFChatting:
 
             with Timer("调整动作", cycle_timers):
                 # 处理特殊的观察
-                await self.action_modifier.modify_actions(observations=observations)
+                # await self.action_modifier.modify_actions(observations=observations)  # 临时注释掉
                 await self.action_observation.observe()
                 observations.append(self.action_observation)
 

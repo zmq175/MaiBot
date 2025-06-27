@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from src.config.config_base import ConfigBase
 
+MMC_VERSION = "0.7.0"
+
 """
 须知：
 1. 本文件中记录了所有的配置项
@@ -65,6 +67,12 @@ class ChatConfig(ConfigBase):
 
     exit_focus_threshold: float = 1.0
     """自动退出专注聊天的阈值，越低越容易退出专注聊天"""
+
+    auto_tts_probability: float = 0.3
+    """auto模式下发送TTS语音的概率（0.0-1.0）"""
+
+    normal_tts_probability: float = 0.1
+    """普通模式下发送TTS语音的概率（0.0-1.0）"""
 
 
 @dataclass
@@ -396,6 +404,20 @@ class MaimMessageConfig(ConfigBase):
 
 
 @dataclass
+class TTSAdapterConfig(ConfigBase):
+    """TTS适配器配置类"""
+
+    enable: bool = False
+    """是否启用TTS适配器"""
+
+    host: str = "127.0.0.1"
+    """TTS适配器主机地址"""
+
+    port: int = 8070
+    """TTS适配器端口"""
+
+
+@dataclass
 class ModelConfig(ConfigBase):
     """模型配置类"""
 
@@ -448,3 +470,57 @@ class ModelConfig(ConfigBase):
 
     pfc_reply_checker: dict[str, Any] = field(default_factory=lambda: {})
     """PFC回复检查模型配置"""
+
+
+@dataclass
+class Config(ConfigBase):
+    """总配置类"""
+
+    MMC_VERSION: str = field(default=MMC_VERSION, repr=False, init=False)  # 硬编码的版本信息
+
+    bot: BotConfig
+    personality: PersonalityConfig
+    identity: IdentityConfig
+    relationship: RelationshipConfig
+    chat: ChatConfig
+    message_receive: MessageReceiveConfig
+    normal_chat: NormalChatConfig
+    focus_chat: FocusChatConfig
+    focus_chat_processor: FocusChatProcessorConfig
+    emoji: EmojiConfig
+    expression: ExpressionConfig
+    memory: MemoryConfig
+    mood: MoodConfig
+    keyword_reaction: KeywordReactionConfig
+    chinese_typo: ChineseTypoConfig
+    response_splitter: ResponseSplitterConfig
+    telemetry: TelemetryConfig
+    experimental: ExperimentalConfig
+    model: ModelConfig
+    maim_message: MaimMessageConfig
+    tts_adapter: TTSAdapterConfig
+
+__all__ = [
+    'BotConfig',
+    'PersonalityConfig',
+    'IdentityConfig',
+    'RelationshipConfig',
+    'ChatConfig',
+    'MessageReceiveConfig',
+    'NormalChatConfig',
+    'FocusChatConfig',
+    'FocusChatProcessorConfig',
+    'EmojiConfig',
+    'ExpressionConfig',
+    'MemoryConfig',
+    'MoodConfig',
+    'KeywordReactionConfig',
+    'ChineseTypoConfig',
+    'ResponseSplitterConfig',
+    'TelemetryConfig',
+    'ExperimentalConfig',
+    'ModelConfig',
+    'MaimMessageConfig',
+    'TTSAdapterConfig',
+    'Config',
+]

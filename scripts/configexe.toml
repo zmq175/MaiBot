@@ -234,6 +234,14 @@ description = "自动切换到专注聊天的阈值，越低越容易进入专�
 name = "退出专注阈值"
 description = "自动退出专注聊天的阈值，越低越容易退出专注聊天"
 
+[translations.items.auto_tts_probability]
+name = "自动模式TTS概率"
+description = "auto模式下发送TTS语音的概率（0.0-1.0），数值越高越容易发送语音"
+
+[translations.items.normal_tts_probability]
+name = "普通模式TTS概率"
+description = "普通模式下发送TTS语音的概率（0.0-1.0），数值越高越容易发送语音"
+
 [translations.items.ban_words]
 name = "禁用词"
 description = "需要过滤的词语列表"

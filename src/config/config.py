@@ -33,6 +33,7 @@ from src.config.official_configs import (
     MessageReceiveConfig,
     MaimMessageConfig,
     RelationshipConfig,
+    TTSAdapterConfig,
 )
 
 install(extra_lines=3)
@@ -161,6 +162,7 @@ class Config(ConfigBase):
     experimental: ExperimentalConfig
     model: ModelConfig
     maim_message: MaimMessageConfig
+    tts_adapter: TTSAdapterConfig
 
 
 def load_config(config_path: str) -> Config:

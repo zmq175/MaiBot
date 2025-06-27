@@ -173,11 +173,13 @@ class ChattingObservation(Observation):
                 "group_name": find_msg.get("chat_info_group_name", ""),
             }
 
-        content_format = ""
-        accept_format = ""
+        # 设置format_info，支持所有消息类型包括tts_text和vtb_text
+        content_format = "text,image,emoji,reply,tts_text,vtb_text,voice"
+        accept_format = "text,image,emoji,reply,tts_text,vtb_text,voice"
+        format_info = {"content_format": content_format, "accept_format": accept_format}
+        logger.debug(f"search_message_by_text: 设置accept_format为: '{accept_format}'")
         template_items = {}
 
-        format_info = {"content_format": content_format, "accept_format": accept_format}
         template_info = {
             "template_items": template_items,
         }

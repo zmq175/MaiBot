@@ -41,11 +41,18 @@ class ChatMessageContext:
     def check_types(self, types: list) -> bool:
         """检查消息类型"""
         # 如果accept_format为空，表示支持所有类型
+        logger.debug(f"check_types: accept_format的实际值: '{self.message.message_info.format_info.accept_format}'")
         if not self.message.message_info.format_info.accept_format:
+            logger.debug(f"check_types: accept_format为空，返回True，支持所有类型: {types}")
             return True
+        
+        # 直接支持tts_text和vtb_text类型
+        supported_types = ['text', 'image', 'emoji', 'reply', 'tts_text', 'vtb_text', 'voice']
         for t in types:
-            if t not in self.message.message_info.format_info.accept_format:
+            if t not in supported_types:
+                logger.debug(f"check_types: 类型{t}不在支持的类型中，返回False")
                 return False
+        logger.debug(f"check_types: 所有类型{types}都在支持的类型中，返回True")
         return True
 
 
@@ -159,6 +166,7 @@ class ChatManager:
         )
         self.last_messages[stream_id] = message
         logger.debug(f"注册消息到聊天流: {stream_id}")
+        logger.debug(f"注册消息的accept_format: '{message.message_info.format_info.accept_format}'")
 
     @staticmethod
     def _generate_stream_id(platform: str, user_info: UserInfo, group_info: Optional[GroupInfo] = None) -> str:

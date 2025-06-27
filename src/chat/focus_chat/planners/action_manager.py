@@ -41,6 +41,11 @@ class ActionManager:
         # 初始化时将默认动作加载到使用中的动作
         self._using_actions = self._default_actions.copy()
 
+        # 添加调试日志
+        logger.info(f"ActionManager初始化完成，注册的动作: {list(self._registered_actions.keys())}")
+        logger.info(f"ActionManager初始化完成，默认动作: {list(self._default_actions.keys())}")
+        logger.info(f"ActionManager初始化完成，当前使用动作: {list(self._using_actions.keys())}")
+
     def _load_registered_actions(self) -> None:
         """
         加载所有通过装饰器注册的动作
@@ -197,6 +202,7 @@ class ActionManager:
 
     def get_using_actions(self) -> Dict[str, ActionInfo]:
         """获取当前正在使用的动作集"""
+        logger.debug(f"get_using_actions被调用，当前_using_actions: {list(self._using_actions.keys())}")
         return self._using_actions.copy()
 
     def add_action_to_using(self, action_name: str) -> bool:
@@ -237,6 +243,7 @@ class ActionManager:
 
         del self._using_actions[action_name]
         logger.info(f"已从使用集中移除动作 {action_name}")
+        logger.debug(f"移除动作后，当前_using_actions: {list(self._using_actions.keys())}")
         return True
 
     def add_action(self, action_name: str, description: str, parameters: Dict = None, require: List = None) -> bool:
