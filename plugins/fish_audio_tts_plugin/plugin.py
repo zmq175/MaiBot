@@ -181,11 +181,13 @@ class FishAudioAction(BaseAction):
             
         # 尝试读取代理配置，如果没读到就用写死的配置
         self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
+        logger.info(f"Fish Audio TTS: Environment proxy URL: {self.proxy_url}")
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Proxy URL loaded from environment: {self.proxy_url}")
         
         # Load configuration from plugin config
         if self.plugin_config:
+            logger.info(f"Fish Audio TTS: Plugin config type: {type(self.plugin_config)}")
             logger.info(f"Fish Audio TTS: Plugin config keys: {list(self.plugin_config.keys()) if isinstance(self.plugin_config, dict) else 'Not a dict'}")
             self.max_retries = self.get_config("max_retries", 3)
             self.timeout = self.get_config("timeout", 30)
@@ -245,7 +247,7 @@ class FishAudioAction(BaseAction):
             logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
             connector_kwargs['proxy'] = self.proxy_url
         else:
-            logger.info("Fish Audio TTS: No proxy configured, using direct connection")
+            logger.warning("Fish Audio TTS: No proxy configured, using direct connection")
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         
@@ -254,6 +256,7 @@ class FishAudioAction(BaseAction):
                 logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                 logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
                 logger.info(f"Fish Audio TTS: Proxy: {self.proxy_url or 'None'}")
+                logger.info(f"Fish Audio TTS: Connector kwargs: {connector_kwargs}")
                 
                 async with aiohttp.ClientSession(
                     timeout=timeout,
