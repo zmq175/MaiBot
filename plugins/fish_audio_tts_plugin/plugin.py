@@ -249,20 +249,21 @@ class FishAudioAction(BaseAction):
             else:
                 logger.info(f"  - {key}: {value}")
         
-        # Prepare request data
+        # Prepare request data according to Fish Audio API documentation
         request_data = {
-            "model_id": self.model_id,
             "text": text,
-            "voice_settings": {
-                "stability": 0.5,
-                "similarity_boost": 0.75
-            }
+            "format": "wav",  # 直接请求WAV格式，支持 wav, pcm, mp3, opus
+            "normalize": True,  # 标准化文本，提高数字和日期的稳定性
+            "latency": "normal",  # 正常延迟模式
+            "reference_id": self.model_id  # 使用模型ID作为reference_id
         }
         
         logger.info(f"Fish Audio TTS: Request data:")
-        logger.info(f"  - Model ID: {request_data['model_id']}")
         logger.info(f"  - Text: {request_data['text'][:50]}{'...' if len(request_data['text']) > 50 else ''}")
-        logger.info(f"  - Voice settings: {request_data['voice_settings']}")
+        logger.info(f"  - Format: {request_data['format']}")
+        logger.info(f"  - Normalize: {request_data['normalize']}")
+        logger.info(f"  - Latency: {request_data['latency']}")
+        logger.info(f"  - Reference ID: {request_data['reference_id']}")
         
         # Pack data using MessagePack
         packed_data = msgpack.packb(request_data)
@@ -370,54 +371,22 @@ class FishAudioAction(BaseAction):
         return None
         
     async def _save_audio(self, audio_data: bytes) -> Path:
-        """Save audio data to file and convert to WAV format for napcat compatibility"""
+        """Save audio data to file"""
         # Create audio directory if it doesn't exist
         audio_dir = Path("data/audio/fish_audio")
         audio_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate filename
         timestamp = int(time.time())
-        mp3_filename = f"fish_audio_{timestamp}.mp3"
-        wav_filename = f"fish_audio_{timestamp}.wav"
+        filename = f"fish_audio_{timestamp}.wav"
+        audio_path = audio_dir / filename
         
-        mp3_path = audio_dir / mp3_filename
-        wav_path = audio_dir / wav_filename
-        
-        # Save original MP3 file
-        with open(mp3_path, "wb") as f:
+        # Save audio file
+        with open(audio_path, "wb") as f:
             f.write(audio_data)
             
-        logger.info(f"Fish Audio TTS: Original MP3 saved to {mp3_path}")
-        
-        # Convert MP3 to WAV format for napcat compatibility
-        try:
-            from pydub import AudioSegment
-            
-            # Load MP3 and convert to WAV
-            audio = AudioSegment.from_mp3(mp3_path)
-            
-            # Export as WAV with napcat-compatible settings
-            audio.export(
-                wav_path, 
-                format="wav",
-                parameters=["-ar", "16000", "-ac", "1"]  # 16kHz, mono
-            )
-            
-            logger.info(f"Fish Audio TTS: Converted to WAV format: {wav_path}")
-            
-            # Clean up MP3 file
-            mp3_path.unlink()
-            logger.info(f"Fish Audio TTS: Cleaned up MP3 file")
-            
-            return wav_path
-            
-        except ImportError:
-            logger.warning("Fish Audio TTS: pydub not available, using original MP3 format")
-            return mp3_path
-        except Exception as e:
-            logger.error(f"Fish Audio TTS: Audio conversion failed: {e}")
-            logger.info(f"Fish Audio TTS: Using original MP3 format")
-            return mp3_path
+        logger.info(f"Fish Audio TTS: Audio saved to {audio_path}")
+        return audio_path
 
     def _process_text_for_tts(self, text: str) -> str:
         """
