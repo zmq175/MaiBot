@@ -151,8 +151,11 @@ class FishAudioAction(BaseAction):
                 # Save audio file
                 audio_path = await self._save_audio(audio_data)
                 
+                # Convert to absolute path for napcat compatibility
+                absolute_audio_path = str(audio_path.absolute())
+                
                 # Send audio message using voiceurl type
-                await self.send_custom(message_type="voiceurl", content=str(audio_path))
+                await self.send_custom(message_type="voiceurl", content=absolute_audio_path)
                 
                 logger.info(f"{self.log_prefix} Fish Audio TTS动作执行成功，文本长度: {len(processed_text)}")
                 return True, f"Fish Audio TTS动作执行成功: {processed_text[:50]}..."
