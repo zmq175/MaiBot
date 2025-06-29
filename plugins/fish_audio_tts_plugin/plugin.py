@@ -173,7 +173,7 @@ class FishAudioAction(BaseAction):
         if not self.model_id:
             logger.warning("Fish Audio TTS: FISH_AUDIO_MODEL_ID not found in environment")
             
-        # Load proxy configuration
+        # Load proxy configuration from environment
         self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
         
         # Load configuration from plugin config
@@ -181,6 +181,12 @@ class FishAudioAction(BaseAction):
         if plugin_config:
             self.max_retries = plugin_config.get("max_retries", 3)
             self.timeout = plugin_config.get("timeout", 30)
+            
+            # 从插件配置读取代理设置
+            proxy_config = plugin_config.get("proxy", {})
+            if proxy_config.get("enabled", False) and not self.proxy_url:
+                self.proxy_url = proxy_config.get("url", "")
+                logger.info(f"Fish Audio TTS: Using proxy from config: {self.proxy_url}")
             
     async def _generate_speech(self, text: str) -> Optional[bytes]:
         """Generate speech using Fish Audio API"""
@@ -205,6 +211,7 @@ class FishAudioAction(BaseAction):
         # Configure session with proxy if needed
         connector_kwargs = {}
         if self.proxy_url:
+            logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
             connector_kwargs['proxy'] = self.proxy_url
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
@@ -215,6 +222,7 @@ class FishAudioAction(BaseAction):
                     timeout=timeout,
                     connector=aiohttp.TCPConnector(**connector_kwargs) if connector_kwargs else None
                 ) as session:
+                    logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                     async with session.post(
                         f"{self.api_base_url}/tts",
                         headers=headers,

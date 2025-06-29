@@ -9,7 +9,7 @@ enable_fish_audio_command = true
 
 [fish_audio]
 max_retries = 3
-timeout = 30
+timeout = 60
 random_activation_probability = 0.8
 
 [fish_audio.voice_settings]
@@ -17,8 +17,8 @@ stability = 0.5
 similarity_boost = 0.75
 
 [proxy]
-enabled = false
-url = ""
+enabled = true
+url = "socks5://127.0.0.1:1080"
 
 [logging]
 level = "INFO"
