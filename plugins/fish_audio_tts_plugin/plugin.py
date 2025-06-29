@@ -131,6 +131,9 @@ class FishAudioAction(BaseAction):
     async def execute(self) -> Tuple[bool, str]:
         """Execute the Fish Audio TTS action"""
         try:
+            # Load configuration first
+            await self._load_config()
+            
             # Get the text to synthesize
             text = self.action_data.get("text", "")
             
@@ -179,9 +182,8 @@ class FishAudioAction(BaseAction):
         else:
             logger.info("Fish Audio TTS: Model ID loaded from environment")
             
-        # 尝试读取代理配置，如果没读到就用写死的配置
+        # Load proxy configuration - environment variables take precedence
         self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
-        logger.info(f"Fish Audio TTS: Environment proxy URL: {self.proxy_url}")
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Proxy URL loaded from environment: {self.proxy_url}")
         
@@ -209,11 +211,6 @@ class FishAudioAction(BaseAction):
                 logger.info(f"Fish Audio TTS: Using proxy from environment (overrides config): {self.proxy_url}")
         else:
             logger.warning("Fish Audio TTS: No plugin config available")
-        
-        # 如果还是没有代理配置，使用写死的配置
-        if not self.proxy_url:
-            self.proxy_url = "socks5://127.0.0.1:1080"
-            logger.info(f"Fish Audio TTS: Using hardcoded fallback proxy: {self.proxy_url}")
         
         # Final proxy status log
         if self.proxy_url:
