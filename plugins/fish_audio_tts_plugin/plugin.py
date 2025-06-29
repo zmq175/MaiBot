@@ -305,7 +305,7 @@ class FishAudioAction(BaseAction):
                     timeout=timeout,
                     verify=False,  # 禁用SSL验证，可能有助于连接
                     limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
-                    proxies=proxy_config if proxy_config else None
+                    proxy=proxy_config
                 ) as client:
                     logger.info(f"Fish Audio TTS: HTTP client created successfully")
                     logger.info(f"Fish Audio TTS: Sending POST request to {self.api_base_url}/tts")
