@@ -29,14 +29,14 @@ class FishAudioAction(BaseAction):
     Supports proxy configuration for regions where Fish Audio is not directly accessible.
     """
 
-    # 激活设置 - Focus模式使用LLM判断，Normal模式一直激活
+    # 激活设置 - Focus模式使用LLM判断，Normal模式随机触发
     focus_activation_type = ActionActivationType.LLM_JUDGE
-    normal_activation_type = ActionActivationType.ALWAYS
+    normal_activation_type = ActionActivationType.RANDOM
     mode_enable = ChatMode.ALL
     parallel_action = False
     
-    # Normal模式下的随机激活概率（LLM_JUDGE会被转换为概率激活）
-    random_activation_probability = 0.15  # 15%的概率，相对保守
+    # Normal模式下的随机激活概率
+    random_activation_probability = 0.5  # 50%概率触发
 
     # LLM判断提示词（用于Focus模式）
     llm_judge_prompt = """
@@ -514,7 +514,7 @@ class FishAudioTTSPlugin(BasePlugin):
         "fish_audio": {
             "max_retries": ConfigField(type=int, default=3, description="API调用最大重试次数"),
             "timeout": ConfigField(type=int, default=30, description="API调用超时时间（秒）"),
-            "random_activation_probability": ConfigField(type=float, default=0.15, description="Normal模式下随机触发概率（0.0-1.0）", example=0.15),
+            "random_activation_probability": ConfigField(type=float, default=0.5, description="Normal模式下随机触发概率（0.0-1.0）", example=0.5),
             "voice_settings": {
                 "stability": ConfigField(type=float, default=0.5, description="语音稳定性 (0.0-1.0)"),
                 "similarity_boost": ConfigField(type=float, default=0.75, description="相似度提升 (0.0-1.0)"),
@@ -541,7 +541,7 @@ class FishAudioTTSPlugin(BasePlugin):
         
         # 动态设置随机激活概率
         if enable_fish_audio_tts:
-            random_probability = self.get_config("fish_audio.random_activation_probability", 0.15)
+            random_probability = self.get_config("fish_audio.random_activation_probability", 0.5)
             FishAudioAction.random_activation_probability = random_probability
         
         components = []
