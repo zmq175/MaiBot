@@ -29,9 +29,9 @@ class FishAudioAction(BaseAction):
     Supports proxy configuration for regions where Fish Audio is not directly accessible.
     """
 
-    # 激活设置 - 两种模式都使用LLM判断
+    # 激活设置 - Focus模式使用LLM判断，Normal模式一直激活
     focus_activation_type = ActionActivationType.LLM_JUDGE
-    normal_activation_type = ActionActivationType.LLM_JUDGE
+    normal_activation_type = ActionActivationType.ALWAYS
     mode_enable = ChatMode.ALL
     parallel_action = False
     
