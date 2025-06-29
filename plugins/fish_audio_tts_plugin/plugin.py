@@ -12,6 +12,8 @@ import httpx
 import msgpack
 from pathlib import Path
 import os
+import socket
+import socks
 
 from src.plugin_system import (
     BasePlugin, register_plugin, BaseAction, BaseCommand,
@@ -212,6 +214,23 @@ class FishAudioAction(BaseAction):
         else:
             logger.warning("Fish Audio TTS: No plugin config available")
         
+        # 设置 PySocks monkey patching
+        if self.proxy_url:
+            try:
+                # 解析代理URL
+                if self.proxy_url.startswith("socks5://"):
+                    proxy_host = "127.0.0.1"
+                    proxy_port = 1080
+                    # 设置默认代理
+                    socks.set_default_proxy(socks.SOCKS5, proxy_host, proxy_port)
+                    # 应用 monkey patching
+                    socket.socket = socks.socksocket
+                    logger.info(f"Fish Audio TTS: PySocks monkey patching applied for {self.proxy_url}")
+                else:
+                    logger.warning(f"Fish Audio TTS: Unsupported proxy protocol: {self.proxy_url}")
+            except Exception as e:
+                logger.error(f"Fish Audio TTS: Failed to setup PySocks: {e}")
+        
         # Final proxy status log
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Final proxy configuration: {self.proxy_url}")
@@ -219,7 +238,7 @@ class FishAudioAction(BaseAction):
             logger.info("Fish Audio TTS: No proxy configured, will use direct connection")
             
     async def _generate_speech(self, text: str) -> Optional[bytes]:
-        """Generate speech using Fish Audio API with httpx for better proxy support"""
+        """Generate speech using Fish Audio API with transparent proxy support via PySocks"""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/msgpack"
@@ -238,25 +257,16 @@ class FishAudioAction(BaseAction):
         # Pack data using MessagePack
         packed_data = msgpack.packb(request_data)
         
-        # Configure proxy settings
-        proxies = None
-        if self.proxy_url:
-            logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
-            proxies = self.proxy_url
-        else:
-            logger.warning("Fish Audio TTS: No proxy configured, using direct connection")
-            
         timeout = httpx.Timeout(timeout=self.timeout)
         
         for attempt in range(self.max_retries):
             try:
                 logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                 logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
-                logger.info(f"Fish Audio TTS: Proxy: {proxies or 'None'}")
+                logger.info(f"Fish Audio TTS: Proxy: {self.proxy_url or 'None (direct connection)'}")
                 
                 async with httpx.AsyncClient(
                     timeout=timeout,
-                    proxies=proxies,
                     verify=False  # 禁用SSL验证，可能有助于连接
                 ) as client:
                     response = await client.post(
@@ -277,8 +287,6 @@ class FishAudioAction(BaseAction):
                 logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}")
             except httpx.ConnectError as e:
                 logger.error(f"Fish Audio TTS: Connection error on attempt {attempt + 1}: {e}")
-            except httpx.ProxyError as e:
-                logger.error(f"Fish Audio TTS: Proxy error on attempt {attempt + 1}: {e}")
             except Exception as e:
                 logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1}: {e}")
                 logger.error(f"Fish Audio TTS: Error type: {type(e).__name__}")
