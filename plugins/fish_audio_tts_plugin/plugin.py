@@ -252,7 +252,8 @@ class FishAudioAction(BaseAction):
         # Prepare request data according to Fish Audio API documentation
         request_data = {
             "text": text,
-            "format": "wav",  # 直接请求WAV格式，支持 wav, pcm, mp3, opus
+            "format": "opus",  # 使用 Opus 格式，napcat 可以处理
+            "opus_bitrate": 32,  # 32kbps 比特率
             "normalize": True,  # 标准化文本，提高数字和日期的稳定性
             "latency": "normal",  # 正常延迟模式
             "reference_id": self.model_id  # 使用模型ID作为reference_id
@@ -261,6 +262,7 @@ class FishAudioAction(BaseAction):
         logger.info(f"Fish Audio TTS: Request data:")
         logger.info(f"  - Text: {request_data['text'][:50]}{'...' if len(request_data['text']) > 50 else ''}")
         logger.info(f"  - Format: {request_data['format']}")
+        logger.info(f"  - Opus bitrate: {request_data['opus_bitrate']} kbps")
         logger.info(f"  - Normalize: {request_data['normalize']}")
         logger.info(f"  - Latency: {request_data['latency']}")
         logger.info(f"  - Reference ID: {request_data['reference_id']}")
@@ -378,7 +380,7 @@ class FishAudioAction(BaseAction):
         
         # Generate filename
         timestamp = int(time.time())
-        filename = f"fish_audio_{timestamp}.wav"
+        filename = f"fish_audio_{timestamp}.opus"
         audio_path = audio_dir / filename
         
         # Save audio file
