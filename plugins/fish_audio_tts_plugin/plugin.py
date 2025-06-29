@@ -167,14 +167,20 @@ class FishAudioAction(BaseAction):
         self.api_key = os.getenv("FISH_AUDIO_API_KEY")
         if not self.api_key:
             logger.warning("Fish Audio TTS: FISH_AUDIO_API_KEY not found in environment")
+        else:
+            logger.info("Fish Audio TTS: API key loaded from environment")
             
         # Load model ID
         self.model_id = os.getenv("FISH_AUDIO_MODEL_ID")
         if not self.model_id:
             logger.warning("Fish Audio TTS: FISH_AUDIO_MODEL_ID not found in environment")
+        else:
+            logger.info("Fish Audio TTS: Model ID loaded from environment")
             
         # Load proxy configuration from environment
         self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
+        if self.proxy_url:
+            logger.info(f"Fish Audio TTS: Proxy URL loaded from environment: {self.proxy_url}")
         
         # Load configuration from plugin config
         plugin_config = self.get_plugin_config()
@@ -187,6 +193,12 @@ class FishAudioAction(BaseAction):
             if proxy_config.get("enabled", False) and not self.proxy_url:
                 self.proxy_url = proxy_config.get("url", "")
                 logger.info(f"Fish Audio TTS: Using proxy from config: {self.proxy_url}")
+            elif proxy_config.get("enabled", False) and self.proxy_url:
+                logger.info(f"Fish Audio TTS: Using proxy from environment (overrides config): {self.proxy_url}")
+            elif not proxy_config.get("enabled", False):
+                logger.info("Fish Audio TTS: Proxy disabled in config")
+        else:
+            logger.warning("Fish Audio TTS: No plugin config found")
             
     async def _generate_speech(self, text: str) -> Optional[bytes]:
         """Generate speech using Fish Audio API"""
@@ -213,16 +225,21 @@ class FishAudioAction(BaseAction):
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
             connector_kwargs['proxy'] = self.proxy_url
+        else:
+            logger.info("Fish Audio TTS: No proxy configured, using direct connection")
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         
         for attempt in range(self.max_retries):
             try:
+                logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
+                logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
+                logger.info(f"Fish Audio TTS: Proxy: {self.proxy_url or 'None'}")
+                
                 async with aiohttp.ClientSession(
                     timeout=timeout,
                     connector=aiohttp.TCPConnector(**connector_kwargs) if connector_kwargs else None
                 ) as session:
-                    logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                     async with session.post(
                         f"{self.api_base_url}/tts",
                         headers=headers,
@@ -240,6 +257,7 @@ class FishAudioAction(BaseAction):
                 logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}")
             except Exception as e:
                 logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1}: {e}")
+                logger.error(f"Fish Audio TTS: Error type: {type(e).__name__}")
                 
             if attempt < self.max_retries - 1:
                 await asyncio.sleep(2 ** attempt)  # Exponential backoff
