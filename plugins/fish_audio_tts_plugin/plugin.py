@@ -285,7 +285,7 @@ class FishAudioAction(BaseAction):
         logger.info(f"Fish Audio TTS: Packed data size: {len(packed_data)} bytes")
         
         # 增加超时时间，因为代理可能比较慢
-        timeout = httpx.Timeout(timeout=120.0)  # 增加到120秒
+        timeout = httpx.Timeout(120.0)  # 增加到120秒
         
         for attempt in range(self.max_retries):
             logger.info("-" * 40)
@@ -297,7 +297,7 @@ class FishAudioAction(BaseAction):
             try:
                 logger.info(f"Fish Audio TTS: Creating HTTP client...")
                 logger.info(f"Fish Audio TTS: Client settings:")
-                logger.info(f"  - Timeout: {timeout.timeout} seconds")
+                logger.info(f"  - Timeout: 120 seconds")
                 logger.info(f"  - SSL verification: Disabled")
                 logger.info(f"  - Connection limits: max_keepalive=5, max_connections=10")
                 
