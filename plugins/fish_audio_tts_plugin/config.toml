@@ -10,6 +10,7 @@ enable_fish_audio_command = true
 [fish_audio]
 max_retries = 3
 timeout = 30
+random_activation_probability = 0.15
 
 [fish_audio.voice_settings]
 stability = 0.5

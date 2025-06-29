@@ -34,6 +34,9 @@ class FishAudioAction(BaseAction):
     normal_activation_type = ActionActivationType.LLM_JUDGE
     mode_enable = ChatMode.ALL
     parallel_action = False
+    
+    # Normal模式下的随机激活概率（LLM_JUDGE会被转换为概率激活）
+    random_activation_probability = 0.15  # 15%的概率，相对保守
 
     # 动作基本信息
     action_name = "fish_audio_tts_action"
@@ -324,6 +327,7 @@ class FishAudioTTSPlugin(BasePlugin):
         "fish_audio": {
             "max_retries": ConfigField(type=int, default=3, description="API调用最大重试次数"),
             "timeout": ConfigField(type=int, default=30, description="API调用超时时间（秒）"),
+            "random_activation_probability": ConfigField(type=float, default=0.15, description="Normal模式下随机触发概率（0.0-1.0）", example=0.15),
             "voice_settings": {
                 "stability": ConfigField(type=float, default=0.5, description="语音稳定性 (0.0-1.0)"),
                 "similarity_boost": ConfigField(type=float, default=0.75, description="相似度提升 (0.0-1.0)"),
@@ -347,6 +351,11 @@ class FishAudioTTSPlugin(BasePlugin):
         # 从配置获取组件启用状态
         enable_fish_audio_tts = self.get_config("components.enable_fish_audio_tts", True)
         enable_fish_audio_command = self.get_config("components.enable_fish_audio_command", True)
+        
+        # 动态设置随机激活概率
+        if enable_fish_audio_tts:
+            random_probability = self.get_config("fish_audio.random_activation_probability", 0.15)
+            FishAudioAction.random_activation_probability = random_probability
         
         components = []
         
