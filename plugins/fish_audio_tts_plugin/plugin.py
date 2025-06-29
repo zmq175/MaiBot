@@ -60,7 +60,7 @@ class FishAudioAction(BaseAction):
     ]
 
     # 关联类型
-    associated_types = ["tts_text", "audio"]
+    associated_types = []  # 移除类型限制，避免在normal模式下被过滤
 
     def __init__(self):
         super().__init__()
