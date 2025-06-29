@@ -83,8 +83,32 @@ class FishAudioAction(BaseAction):
     # 关联类型
     associated_types = []  # 移除类型限制，避免在normal模式下被过滤
 
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        action_data: dict,
+        reasoning: str,
+        cycle_timers: dict,
+        thinking_id: str,
+        chat_stream=None,
+        log_prefix: str = "",
+        shutting_down: bool = False,
+        plugin_config: dict = None,
+        **kwargs,
+    ):
+        # 调用父类初始化
+        super().__init__(
+            action_data=action_data,
+            reasoning=reasoning,
+            cycle_timers=cycle_timers,
+            thinking_id=thinking_id,
+            chat_stream=chat_stream,
+            log_prefix=log_prefix,
+            shutting_down=shutting_down,
+            plugin_config=plugin_config,
+            **kwargs,
+        )
+        
+        # Fish Audio TTS 特定配置
         self.api_base_url = "https://api.fish.audio/v1"
         self.proxy_url = None
         self.api_key = None
@@ -279,8 +303,16 @@ class FishAudioCommand(BaseCommand):
                 return False, "未提供文本内容"
 
             # Create action instance and execute
-            action = FishAudioAction()
-            action.action_data = {"text": text}
+            action = FishAudioAction(
+                action_data={"text": text},
+                reasoning="",
+                cycle_timers={},
+                thinking_id="",
+                chat_stream=None,
+                log_prefix="",
+                shutting_down=False,
+                plugin_config=None
+            )
             
             # Load configuration
             await action._load_config()
