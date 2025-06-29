@@ -143,6 +143,10 @@ class FishAudioAction(BaseAction):
                 logger.error(f"{self.log_prefix} 执行Fish Audio TTS动作时未提供文本内容")
                 return False, "执行Fish Audio TTS动作失败：未提供文本内容"
 
+            # Test proxy connection first
+            if not await self._test_proxy_connection():
+                return False, "代理连接测试失败，请检查代理配置"
+
             # Ensure text is suitable for TTS
             processed_text = self._process_text_for_tts(text)
             
@@ -237,6 +241,33 @@ class FishAudioAction(BaseAction):
         else:
             logger.info("Fish Audio TTS: No proxy configured, will use direct connection")
             
+    async def _test_proxy_connection(self) -> bool:
+        """Test proxy connection before making TTS request"""
+        if not self.proxy_url:
+            logger.info("Fish Audio TTS: No proxy configured, skipping connection test")
+            return True
+            
+        try:
+            logger.info("Fish Audio TTS: Testing proxy connection...")
+            timeout = httpx.Timeout(timeout=30.0)
+            
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                verify=False
+            ) as client:
+                # 测试连接到Google（通常可以访问）
+                response = await client.get("https://www.google.com")
+                if response.status_code == 200:
+                    logger.info("Fish Audio TTS: Proxy connection test successful")
+                    return True
+                else:
+                    logger.warning(f"Fish Audio TTS: Proxy connection test failed with status {response.status_code}")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Fish Audio TTS: Proxy connection test failed: {e}")
+            return False
+
     async def _generate_speech(self, text: str) -> Optional[bytes]:
         """Generate speech using Fish Audio API with transparent proxy support via PySocks"""
         headers = {
@@ -257,17 +288,21 @@ class FishAudioAction(BaseAction):
         # Pack data using MessagePack
         packed_data = msgpack.packb(request_data)
         
-        timeout = httpx.Timeout(timeout=self.timeout)
+        # 增加超时时间，因为代理可能比较慢
+        timeout = httpx.Timeout(timeout=120.0)  # 增加到120秒
         
         for attempt in range(self.max_retries):
             try:
                 logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                 logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
                 logger.info(f"Fish Audio TTS: Proxy: {self.proxy_url or 'None (direct connection)'}")
+                logger.info(f"Fish Audio TTS: Timeout: {timeout.timeout} seconds")
+                logger.info(f"Fish Audio TTS: Text length: {len(text)} characters")
                 
                 async with httpx.AsyncClient(
                     timeout=timeout,
-                    verify=False  # 禁用SSL验证，可能有助于连接
+                    verify=False,  # 禁用SSL验证，可能有助于连接
+                    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
                 ) as client:
                     response = await client.post(
                         f"{self.api_base_url}/tts",
@@ -278,21 +313,26 @@ class FishAudioAction(BaseAction):
                     if response.status_code == 200:
                         audio_data = response.content
                         logger.info(f"Fish Audio TTS: Successfully generated speech for '{text[:30]}...'")
+                        logger.info(f"Fish Audio TTS: Audio data size: {len(audio_data)} bytes")
                         return audio_data
                     else:
                         error_text = response.text
                         logger.error(f"Fish Audio TTS API error: {response.status_code} - {error_text}")
                         
-            except httpx.TimeoutException:
-                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}")
+            except httpx.TimeoutException as e:
+                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}: {e}")
+                logger.warning(f"Fish Audio TTS: This might be due to slow proxy or network issues")
             except httpx.ConnectError as e:
                 logger.error(f"Fish Audio TTS: Connection error on attempt {attempt + 1}: {e}")
+                logger.error(f"Fish Audio TTS: This might be a proxy connection issue")
             except Exception as e:
                 logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1}: {e}")
                 logger.error(f"Fish Audio TTS: Error type: {type(e).__name__}")
                 
             if attempt < self.max_retries - 1:
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                wait_time = 2 ** attempt
+                logger.info(f"Fish Audio TTS: Waiting {wait_time} seconds before retry...")
+                await asyncio.sleep(wait_time)  # Exponential backoff
                 
         return None
         
