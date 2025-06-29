@@ -8,7 +8,7 @@ import asyncio
 import json
 import time
 from typing import Optional, Dict, Any, Tuple, List, Type
-import aiohttp
+import httpx
 import msgpack
 from pathlib import Path
 import os
@@ -219,7 +219,7 @@ class FishAudioAction(BaseAction):
             logger.info("Fish Audio TTS: No proxy configured, will use direct connection")
             
     async def _generate_speech(self, text: str) -> Optional[bytes]:
-        """Generate speech using Fish Audio API"""
+        """Generate speech using Fish Audio API with httpx for better proxy support"""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/msgpack"
@@ -238,77 +238,49 @@ class FishAudioAction(BaseAction):
         # Pack data using MessagePack
         packed_data = msgpack.packb(request_data)
         
-        # Configure session with proxy if needed
-        session_kwargs = {}
-        proxy_methods = []
-        
+        # Configure proxy settings
+        proxies = None
         if self.proxy_url:
-            logger.info(f"Fish Audio TTS: Original proxy URL: {self.proxy_url}")
-            # 尝试多种代理配置方式
-            if self.proxy_url.startswith("socks5://"):
-                # 方法1: 直接使用SOCKS5
-                proxy_methods.append(("socks5_direct", self.proxy_url))
-                # 方法2: 转换为HTTP代理
-                http_proxy = self.proxy_url.replace("socks5://", "http://")
-                proxy_methods.append(("http_convert", http_proxy))
-            else:
-                proxy_methods.append(("direct", self.proxy_url))
+            logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
+            proxies = self.proxy_url
         else:
-            proxy_methods.append(("none", None))
+            logger.warning("Fish Audio TTS: No proxy configured, using direct connection")
             
-        timeout = aiohttp.ClientTimeout(total=self.timeout)
+        timeout = httpx.Timeout(timeout=self.timeout)
         
         for attempt in range(self.max_retries):
-            # 选择代理方法
-            if attempt < len(proxy_methods):
-                method_name, proxy_url = proxy_methods[attempt]
-            else:
-                # 如果所有代理方法都失败了，尝试直接连接
-                method_name, proxy_url = "direct_none", None
-                
-            session_kwargs = {}
-            if proxy_url:
-                logger.info(f"Fish Audio TTS: Trying proxy method: {method_name} with URL: {proxy_url}")
-                session_kwargs['proxy'] = proxy_url
-                if method_name == "socks5_direct":
-                    # 对于socks5代理，添加额外的连接器配置
-                    session_kwargs['connector'] = aiohttp.TCPConnector(
-                        ssl=False,  # 禁用SSL验证，可能有助于连接
-                        limit=100,
-                        limit_per_host=30
-                    )
-            else:
-                logger.info(f"Fish Audio TTS: Trying direct connection (method: {method_name})")
-                
             try:
                 logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                 logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
-                logger.info(f"Fish Audio TTS: Proxy method: {method_name}")
-                logger.info(f"Fish Audio TTS: Session kwargs: {session_kwargs}")
+                logger.info(f"Fish Audio TTS: Proxy: {proxies or 'None'}")
                 
-                async with aiohttp.ClientSession(
+                async with httpx.AsyncClient(
                     timeout=timeout,
-                    **session_kwargs
-                ) as session:
-                    async with session.post(
+                    proxies=proxies,
+                    verify=False  # 禁用SSL验证，可能有助于连接
+                ) as client:
+                    response = await client.post(
                         f"{self.api_base_url}/tts",
                         headers=headers,
-                        data=packed_data
-                    ) as response:
-                        if response.status == 200:
-                            audio_data = await response.read()
-                            logger.info(f"Fish Audio TTS: Successfully generated speech for '{text[:30]}...'")
-                            return audio_data
-                        else:
-                            error_text = await response.text()
-                            logger.error(f"Fish Audio TTS API error: {response.status} - {error_text}")
-                            
-            except asyncio.TimeoutError:
-                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1} with method {method_name}")
-            except aiohttp.ServerDisconnectedError as e:
-                logger.error(f"Fish Audio TTS: Server disconnected on attempt {attempt + 1} with method {method_name}: {e}")
+                        content=packed_data
+                    )
+                    
+                    if response.status_code == 200:
+                        audio_data = response.content
+                        logger.info(f"Fish Audio TTS: Successfully generated speech for '{text[:30]}...'")
+                        return audio_data
+                    else:
+                        error_text = response.text
+                        logger.error(f"Fish Audio TTS API error: {response.status_code} - {error_text}")
+                        
+            except httpx.TimeoutException:
+                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}")
+            except httpx.ConnectError as e:
+                logger.error(f"Fish Audio TTS: Connection error on attempt {attempt + 1}: {e}")
+            except httpx.ProxyError as e:
+                logger.error(f"Fish Audio TTS: Proxy error on attempt {attempt + 1}: {e}")
             except Exception as e:
-                logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1} with method {method_name}: {e}")
+                logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1}: {e}")
                 logger.error(f"Fish Audio TTS: Error type: {type(e).__name__}")
                 
             if attempt < self.max_retries - 1:

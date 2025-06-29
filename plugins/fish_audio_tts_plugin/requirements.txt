@@ -1,0 +1,10 @@
+# Fish Audio TTS Plugin Dependencies
+
+# HTTP client with better SOCKS5 proxy support
+httpx[socks]>=0.24.0
+
+# MessagePack for binary data serialization
+msgpack>=1.0.0
+
+# Path handling
+pathlib2>=2.3.0; python_version < "3.4" 
