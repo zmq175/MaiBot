@@ -181,24 +181,31 @@ class FishAudioAction(BaseAction):
         self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Proxy URL loaded from environment: {self.proxy_url}")
+        else:
+            logger.info("Fish Audio TTS: No proxy URL in environment variables")
         
         # Load configuration from plugin config
-        plugin_config = self.get_plugin_config()
-        if plugin_config:
-            self.max_retries = plugin_config.get("max_retries", 3)
-            self.timeout = plugin_config.get("timeout", 30)
+        if self.plugin_config:
+            self.max_retries = self.get_config("max_retries", 3)
+            self.timeout = self.get_config("timeout", 30)
             
             # 从插件配置读取代理设置
-            proxy_config = plugin_config.get("proxy", {})
-            if proxy_config.get("enabled", False) and not self.proxy_url:
-                self.proxy_url = proxy_config.get("url", "")
+            proxy_enabled = self.get_config("proxy.enabled", False)
+            if proxy_enabled and not self.proxy_url:
+                self.proxy_url = self.get_config("proxy.url", "")
                 logger.info(f"Fish Audio TTS: Using proxy from config: {self.proxy_url}")
-            elif proxy_config.get("enabled", False) and self.proxy_url:
+            elif proxy_enabled and self.proxy_url:
                 logger.info(f"Fish Audio TTS: Using proxy from environment (overrides config): {self.proxy_url}")
-            elif not proxy_config.get("enabled", False):
+            elif not proxy_enabled:
                 logger.info("Fish Audio TTS: Proxy disabled in config")
         else:
             logger.warning("Fish Audio TTS: No plugin config found")
+            
+        # 最终确认代理配置
+        if self.proxy_url:
+            logger.info(f"Fish Audio TTS: Final proxy configuration: {self.proxy_url}")
+        else:
+            logger.warning("Fish Audio TTS: No proxy configured - this may cause connection issues")
             
     async def _generate_speech(self, text: str) -> Optional[bytes]:
         """Generate speech using Fish Audio API"""
