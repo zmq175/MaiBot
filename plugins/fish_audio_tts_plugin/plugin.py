@@ -163,6 +163,8 @@ class FishAudioAction(BaseAction):
 
     async def _load_config(self):
         """Load configuration from environment or config file"""
+        logger.info(f"Fish Audio TTS: Loading configuration, plugin_config: {self.plugin_config is not None}")
+        
         # Load API key
         self.api_key = os.getenv("FISH_AUDIO_API_KEY")
         if not self.api_key:
@@ -177,35 +179,40 @@ class FishAudioAction(BaseAction):
         else:
             logger.info("Fish Audio TTS: Model ID loaded from environment")
             
-        # Load proxy configuration from environment
+        # Load proxy configuration - environment variables take precedence
         self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Proxy URL loaded from environment: {self.proxy_url}")
-        else:
-            logger.info("Fish Audio TTS: No proxy URL in environment variables")
         
         # Load configuration from plugin config
         if self.plugin_config:
+            logger.info(f"Fish Audio TTS: Plugin config keys: {list(self.plugin_config.keys()) if isinstance(self.plugin_config, dict) else 'Not a dict'}")
             self.max_retries = self.get_config("max_retries", 3)
             self.timeout = self.get_config("timeout", 30)
             
-            # 从插件配置读取代理设置
-            proxy_enabled = self.get_config("proxy.enabled", False)
-            if proxy_enabled and not self.proxy_url:
-                self.proxy_url = self.get_config("proxy.url", "")
-                logger.info(f"Fish Audio TTS: Using proxy from config: {self.proxy_url}")
-            elif proxy_enabled and self.proxy_url:
+            # 从插件配置读取代理设置（如果环境变量未设置）
+            if not self.proxy_url:
+                proxy_enabled = self.get_config("proxy.enabled", False)
+                logger.info(f"Fish Audio TTS: Proxy enabled from config: {proxy_enabled}")
+                if proxy_enabled:
+                    self.proxy_url = self.get_config("proxy.url", "")
+                    logger.info(f"Fish Audio TTS: Proxy URL from config: {self.proxy_url}")
+                    if self.proxy_url:
+                        logger.info(f"Fish Audio TTS: Using proxy from config: {self.proxy_url}")
+                    else:
+                        logger.warning("Fish Audio TTS: Proxy enabled in config but no URL provided")
+                else:
+                    logger.info("Fish Audio TTS: Proxy disabled in config")
+            else:
                 logger.info(f"Fish Audio TTS: Using proxy from environment (overrides config): {self.proxy_url}")
-            elif not proxy_enabled:
-                logger.info("Fish Audio TTS: Proxy disabled in config")
         else:
-            logger.warning("Fish Audio TTS: No plugin config found")
-            
-        # 最终确认代理配置
+            logger.warning("Fish Audio TTS: No plugin config available")
+        
+        # Final proxy status log
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Final proxy configuration: {self.proxy_url}")
         else:
-            logger.warning("Fish Audio TTS: No proxy configured - this may cause connection issues")
+            logger.info("Fish Audio TTS: No proxy configured, will use direct connection")
             
     async def _generate_speech(self, text: str) -> Optional[bytes]:
         """Generate speech using Fish Audio API"""
