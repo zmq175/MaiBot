@@ -12,8 +12,6 @@ import httpx
 import msgpack
 from pathlib import Path
 import os
-import socket
-import socks
 
 from src.plugin_system import (
     BasePlugin, register_plugin, BaseAction, BaseCommand,
@@ -214,23 +212,6 @@ class FishAudioAction(BaseAction):
         else:
             logger.warning("Fish Audio TTS: No plugin config available")
         
-        # 设置 PySocks monkey patching
-        if self.proxy_url:
-            try:
-                # 解析代理URL
-                if self.proxy_url.startswith("socks5://"):
-                    proxy_host = "127.0.0.1"
-                    proxy_port = 1080
-                    # 设置默认代理（无认证）
-                    socks.set_default_proxy(socks.SOCKS5, proxy_host, proxy_port)
-                    # 应用 monkey patching
-                    socket.socket = socks.socksocket
-                    logger.info(f"Fish Audio TTS: PySocks monkey patching applied for {self.proxy_url}")
-                else:
-                    logger.warning(f"Fish Audio TTS: Unsupported proxy protocol: {self.proxy_url}")
-            except Exception as e:
-                logger.error(f"Fish Audio TTS: Failed to setup PySocks: {e}")
-        
         # Final proxy status log
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Final proxy configuration: {self.proxy_url}")
@@ -301,10 +282,30 @@ class FishAudioAction(BaseAction):
                 logger.info(f"  - SSL verification: Disabled")
                 logger.info(f"  - Connection limits: max_keepalive=5, max_connections=10")
                 
+                # 配置代理
+                proxy_config = None
+                if self.proxy_url:
+                    logger.info(f"Fish Audio TTS: Configuring proxy: {self.proxy_url}")
+                    # 根据httpx文档，SOCKS代理需要特殊处理
+                    if self.proxy_url.startswith("socks5://"):
+                        # 对于SOCKS5代理，需要确保URL格式正确
+                        proxy_config = self.proxy_url
+                        logger.info(f"Fish Audio TTS: SOCKS5 proxy configuration: {proxy_config}")
+                    elif self.proxy_url.startswith("http://") or self.proxy_url.startswith("https://"):
+                        # HTTP代理
+                        proxy_config = self.proxy_url
+                        logger.info(f"Fish Audio TTS: HTTP proxy configuration: {proxy_config}")
+                    else:
+                        logger.warning(f"Fish Audio TTS: Unsupported proxy protocol: {self.proxy_url}")
+                        proxy_config = None
+                else:
+                    logger.info("Fish Audio TTS: No proxy configured, using direct connection")
+                
                 async with httpx.AsyncClient(
                     timeout=timeout,
                     verify=False,  # 禁用SSL验证，可能有助于连接
-                    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+                    limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+                    proxies=proxy_config if proxy_config else None
                 ) as client:
                     logger.info(f"Fish Audio TTS: HTTP client created successfully")
                     logger.info(f"Fish Audio TTS: Sending POST request to {self.api_base_url}/tts")

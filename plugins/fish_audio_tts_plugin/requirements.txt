@@ -1,10 +1,7 @@
 # Fish Audio TTS Plugin Dependencies
 
-# HTTP client
-httpx>=0.24.0
-
-# SOCKS proxy support for transparent proxy usage
-PySocks>=1.7.1
+# HTTP client with SOCKS support
+httpx[socks]>=0.24.0
 
 # MessagePack for binary data serialization
 msgpack>=1.0.0
