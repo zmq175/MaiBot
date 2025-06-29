@@ -1,0 +1,24 @@
+# Fish Audio TTS Plugin Configuration
+
+[plugin]
+enabled = true
+
+[components]
+enable_fish_audio_tts = true
+enable_fish_audio_command = true
+
+[fish_audio]
+max_retries = 3
+timeout = 30
+
+[fish_audio.voice_settings]
+stability = 0.5
+similarity_boost = 0.75
+
+[proxy]
+enabled = false
+url = ""
+
+[logging]
+level = "INFO"
+prefix = "[Fish Audio TTS]" 

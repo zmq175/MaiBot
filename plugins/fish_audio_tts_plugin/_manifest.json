@@ -1,0 +1,60 @@
+{
+  "manifest_version": 1,
+  "name": "Fish Audio TTS Plugin",
+  "version": "1.0.0",
+  "description": "Fish Audio TTS plugin with LLM-based triggering and proxy support",
+  "author": {
+    "name": "MaiBot Community",
+    "url": "https://github.com/MaiM-with-u"
+  },
+  "license": "MIT",
+  
+  "host_application": {
+    "min_version": "0.8.0",
+    "max_version": "0.8.0"
+  },
+  "homepage_url": "https://github.com/MaiM-with-u/maibot",
+  "repository_url": "https://github.com/MaiM-with-u/maibot",
+  "keywords": ["tts", "audio", "fish-audio", "voice", "speech"],
+  "categories": ["Audio", "TTS"],
+  
+  "default_locale": "zh-CN",
+  "locales_path": "_locales",
+  
+  "plugin_info": {
+    "is_built_in": false,
+    "plugin_type": "audio",
+    "components": [
+      {
+        "type": "action",
+        "name": "fish_audio_tts_action",
+        "description": "使用Fish Audio API将文本转换为高质量语音，支持LLM智能判断和代理访问",
+        "activation_modes": ["llm_judge"],
+        "supported_modes": ["focus", "normal"]
+      },
+      {
+        "type": "command",
+        "name": "fish_audio_tts",
+        "description": "手动触发Fish Audio TTS语音合成",
+        "pattern": "/fish_audio"
+      }
+    ],
+    "features": [
+      "Fish Audio API集成",
+      "LLM智能触发判断",
+      "代理访问支持",
+      "高质量语音合成",
+      "音频文件保存",
+      "手动命令触发"
+    ],
+    "dependencies": [
+      "requests",
+      "msgpack"
+    ],
+    "environment_variables": [
+      "FISH_AUDIO_API_KEY",
+      "FISH_AUDIO_MODEL_ID", 
+      "FISH_AUDIO_PROXY_URL"
+    ]
+  }
+} 

@@ -15,9 +15,8 @@ import os
 
 from src.plugin_system import (
     BasePlugin, register_plugin, BaseAction, BaseCommand,
-    ComponentInfo, ActionActivationType, ChatMode
+    ComponentInfo, ActionActivationType, ChatMode, ConfigField
 )
-from src.plugin_system.base.config_types import ConfigField
 from src.common.logger import get_logger
 
 logger = get_logger("fish_audio_tts")
