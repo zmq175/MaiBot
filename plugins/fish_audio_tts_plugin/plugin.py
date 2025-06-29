@@ -239,10 +239,10 @@ class FishAudioAction(BaseAction):
         packed_data = msgpack.packb(request_data)
         
         # Configure session with proxy if needed
-        connector_kwargs = {}
+        session_kwargs = {}
         if self.proxy_url:
             logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
-            connector_kwargs['proxy'] = self.proxy_url
+            session_kwargs['proxy'] = self.proxy_url
         else:
             logger.warning("Fish Audio TTS: No proxy configured, using direct connection")
             
@@ -253,11 +253,11 @@ class FishAudioAction(BaseAction):
                 logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                 logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
                 logger.info(f"Fish Audio TTS: Proxy: {self.proxy_url or 'None'}")
-                logger.info(f"Fish Audio TTS: Connector kwargs: {connector_kwargs}")
+                logger.info(f"Fish Audio TTS: Session kwargs: {session_kwargs}")
                 
                 async with aiohttp.ClientSession(
                     timeout=timeout,
-                    connector=aiohttp.TCPConnector(**connector_kwargs) if connector_kwargs else None
+                    **session_kwargs
                 ) as session:
                     async with session.post(
                         f"{self.api_base_url}/tts",
