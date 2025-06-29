@@ -1,0 +1,360 @@
+"""Fish Audio TTS Plugin for MaiBot
+
+This plugin provides text-to-speech functionality using Fish Audio API.
+Supports LLM-based triggering and proxy access for regions where Fish Audio is not directly accessible.
+"""
+
+import asyncio
+import json
+import time
+from typing import Optional, Dict, Any, Tuple, List, Type
+import aiohttp
+import msgpack
+from pathlib import Path
+import os
+
+from src.plugin_system import (
+    BasePlugin, register_plugin, BaseAction, BaseCommand,
+    ComponentInfo, ActionActivationType, ChatMode
+)
+from src.plugin_system.base.config_types import ConfigField
+from src.common.logger import get_logger
+
+logger = get_logger("fish_audio_tts")
+
+
+class FishAudioAction(BaseAction):
+    """Fish Audio TTS Action
+    
+    Uses LLM to intelligently decide when to trigger TTS synthesis using Fish Audio API.
+    Supports proxy configuration for regions where Fish Audio is not directly accessible.
+    """
+
+    # 激活设置 - 两种模式都使用LLM判断
+    focus_activation_type = ActionActivationType.LLM_JUDGE
+    normal_activation_type = ActionActivationType.LLM_JUDGE
+    mode_enable = ChatMode.ALL
+    parallel_action = False
+
+    # 动作基本信息
+    action_name = "fish_audio_tts_action"
+    action_description = "使用Fish Audio API将文本转换为高质量语音，支持LLM智能判断和代理访问"
+
+    # 动作参数定义
+    action_parameters = {
+        "text": "需要转换为语音的文本内容，必填，内容应当适合语音播报，语句流畅、清晰",
+    }
+
+    # 动作使用场景
+    action_require = [
+        "当需要发送高质量语音信息时使用",
+        "当用户明确要求使用Fish Audio语音功能时使用",
+        "当表达内容更适合用语音而不是文字传达时使用",
+        "当用户想听到高质量语音回答时使用",
+        "当对话内容包含情感表达或需要语音强调时使用",
+        "当回复内容较长且适合语音播报时使用",
+        "当用户表达需要语音回复的意愿时使用",
+        "当对话内容包含故事、诗歌或需要情感渲染的文本时使用",
+    ]
+
+    # 关联类型
+    associated_types = ["tts_text", "audio"]
+
+    def __init__(self):
+        super().__init__()
+        self.api_base_url = "https://api.fish.audio/v1"
+        self.proxy_url = None
+        self.api_key = None
+        self.model_id = None
+        self.max_retries = 3
+        self.timeout = 30
+
+    async def can_execute(self) -> bool:
+        """Check if the action should be executed"""
+        # Load configuration
+        await self._load_config()
+        
+        # Check if we have required configuration
+        if not self.api_key or not self.model_id:
+            logger.warning("Fish Audio TTS: Missing API key or model ID")
+            return False
+            
+        return True
+
+    async def execute(self) -> Tuple[bool, str]:
+        """Execute the Fish Audio TTS action"""
+        try:
+            # Get the text to synthesize
+            text = self.action_data.get("text", "")
+            
+            if not text:
+                logger.error(f"{self.log_prefix} 执行Fish Audio TTS动作时未提供文本内容")
+                return False, "执行Fish Audio TTS动作失败：未提供文本内容"
+
+            # Ensure text is suitable for TTS
+            processed_text = self._process_text_for_tts(text)
+            
+            # Generate speech
+            audio_data = await self._generate_speech(processed_text)
+            
+            if audio_data:
+                # Save audio file
+                audio_path = await self._save_audio(audio_data)
+                
+                # Send audio message
+                await self.send_custom(message_type="audio", content="", audio_path=str(audio_path))
+                
+                logger.info(f"{self.log_prefix} Fish Audio TTS动作执行成功，文本长度: {len(processed_text)}")
+                return True, f"Fish Audio TTS动作执行成功: {processed_text[:50]}..."
+            else:
+                logger.error(f"{self.log_prefix} Fish Audio TTS生成语音失败")
+                return False, "Fish Audio TTS生成语音失败"
+                
+        except Exception as e:
+            logger.error(f"{self.log_prefix} 执行Fish Audio TTS动作时出错: {e}")
+            return False, f"执行Fish Audio TTS动作时出错: {e}"
+
+    async def _load_config(self):
+        """Load configuration from environment or config file"""
+        # Load API key
+        self.api_key = os.getenv("FISH_AUDIO_API_KEY")
+        if not self.api_key:
+            logger.warning("Fish Audio TTS: FISH_AUDIO_API_KEY not found in environment")
+            
+        # Load model ID
+        self.model_id = os.getenv("FISH_AUDIO_MODEL_ID")
+        if not self.model_id:
+            logger.warning("Fish Audio TTS: FISH_AUDIO_MODEL_ID not found in environment")
+            
+        # Load proxy configuration
+        self.proxy_url = os.getenv("FISH_AUDIO_PROXY_URL")
+        
+        # Load configuration from plugin config
+        plugin_config = self.get_plugin_config()
+        if plugin_config:
+            self.max_retries = plugin_config.get("max_retries", 3)
+            self.timeout = plugin_config.get("timeout", 30)
+            
+    async def _generate_speech(self, text: str) -> Optional[bytes]:
+        """Generate speech using Fish Audio API"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/msgpack"
+        }
+        
+        # Prepare request data
+        request_data = {
+            "model_id": self.model_id,
+            "text": text,
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75
+            }
+        }
+        
+        # Pack data using MessagePack
+        packed_data = msgpack.packb(request_data)
+        
+        # Configure session with proxy if needed
+        connector_kwargs = {}
+        if self.proxy_url:
+            connector_kwargs['proxy'] = self.proxy_url
+            
+        timeout = aiohttp.ClientTimeout(total=self.timeout)
+        
+        for attempt in range(self.max_retries):
+            try:
+                async with aiohttp.ClientSession(
+                    timeout=timeout,
+                    connector=aiohttp.TCPConnector(**connector_kwargs) if connector_kwargs else None
+                ) as session:
+                    async with session.post(
+                        f"{self.api_base_url}/tts",
+                        headers=headers,
+                        data=packed_data
+                    ) as response:
+                        if response.status == 200:
+                            audio_data = await response.read()
+                            logger.info(f"Fish Audio TTS: Successfully generated speech for '{text[:30]}...'")
+                            return audio_data
+                        else:
+                            error_text = await response.text()
+                            logger.error(f"Fish Audio TTS API error: {response.status} - {error_text}")
+                            
+            except asyncio.TimeoutError:
+                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}")
+            except Exception as e:
+                logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1}: {e}")
+                
+            if attempt < self.max_retries - 1:
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                
+        return None
+        
+    async def _save_audio(self, audio_data: bytes) -> Path:
+        """Save audio data to file"""
+        # Create audio directory if it doesn't exist
+        audio_dir = Path("data/audio/fish_audio")
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename
+        timestamp = int(time.time())
+        filename = f"fish_audio_{timestamp}.wav"
+        audio_path = audio_dir / filename
+        
+        # Save audio file
+        with open(audio_path, "wb") as f:
+            f.write(audio_data)
+            
+        logger.info(f"Fish Audio TTS: Audio saved to {audio_path}")
+        return audio_path
+
+    def _process_text_for_tts(self, text: str) -> str:
+        """
+        处理文本使其更适合TTS使用
+        - 移除不必要的特殊字符和表情符号
+        - 修正标点符号以提高语音质量
+        - 优化文本结构使语音更流畅
+        """
+        import re
+
+        # 移除多余的标点符号
+        processed_text = re.sub(r"([!?,.;:。！？，、；：])\1+", r"\1", text)
+
+        # 确保句子结尾有合适的标点
+        if not any(processed_text.endswith(end) for end in [".", "?", "!", "。", "！", "？"]):
+            processed_text = processed_text + "。"
+
+        return processed_text
+
+
+class FishAudioCommand(BaseCommand):
+    """Fish Audio TTS Command
+    
+    手动触发Fish Audio TTS功能
+    """
+
+    # 命令基本信息
+    command_name = "fish_audio_tts"
+    command_description = "手动触发Fish Audio TTS语音合成"
+    command_pattern = r"^/fish_audio\s+(.+)$"
+    intercept_message = True
+
+    # 命令参数定义
+    command_parameters = {
+        "text": "需要转换为语音的文本内容"
+    }
+
+    async def execute(self) -> Tuple[bool, str]:
+        """Execute the Fish Audio TTS command"""
+        try:
+            # Get the text from command
+            text = self.command_data.get("text", "")
+            
+            if not text:
+                await self.send_text("❌ 请提供要转换的文本内容\n用法: /fish_audio <文本内容>")
+                return False, "未提供文本内容"
+
+            # Create action instance and execute
+            action = FishAudioAction()
+            action.action_data = {"text": text}
+            
+            # Load configuration
+            await action._load_config()
+            
+            if not action.api_key or not action.model_id:
+                await self.send_text("❌ Fish Audio TTS未正确配置，请检查API密钥和模型ID")
+                return False, "配置错误"
+            
+            # Generate speech
+            audio_data = await action._generate_speech(text)
+            
+            if audio_data:
+                # Save audio file
+                audio_path = await action._save_audio(audio_data)
+                
+                # Send audio message
+                await self.send_custom(message_type="audio", content="", audio_path=str(audio_path))
+                
+                await self.send_text(f"✅ 语音生成成功！文本: {text[:50]}...")
+                return True, f"Fish Audio TTS命令执行成功: {text[:50]}..."
+            else:
+                await self.send_text("❌ 语音生成失败，请检查网络连接和API配置")
+                return False, "语音生成失败"
+                
+        except Exception as e:
+            logger.error(f"Fish Audio TTS命令执行错误: {e}")
+            await self.send_text(f"❌ 命令执行出错: {e}")
+            return False, f"命令执行出错: {e}"
+
+
+@register_plugin
+class FishAudioTTSPlugin(BasePlugin):
+    """Fish Audio TTS Plugin
+    
+    A plugin that provides text-to-speech functionality using Fish Audio API.
+    Supports LLM-based triggering and proxy access for regions where Fish Audio is not directly accessible.
+    """
+
+    # 插件基本信息（必须填写）
+    plugin_name = "fish_audio_tts_plugin"  # 内部标识符
+    plugin_description = "Fish Audio TTS插件，支持LLM智能判断和代理访问"
+    plugin_version = "1.0.0"
+    plugin_author = "MaiBot Community"
+    enable_plugin = True  # 启用插件
+    config_file_name = "config.toml"  # 配置文件名
+
+    # 配置节描述
+    config_section_descriptions = {
+        "plugin": "插件基本信息配置",
+        "components": "组件启用控制",
+        "fish_audio": "Fish Audio API配置",
+        "proxy": "代理配置",
+        "logging": "日志记录相关配置",
+    }
+
+    # 配置Schema定义
+    config_schema = {
+        "plugin": {
+            "enabled": ConfigField(type=bool, default=True, description="是否启用插件")
+        },
+        "components": {
+            "enable_fish_audio_tts": ConfigField(type=bool, default=True, description="是否启用Fish Audio TTS Action"),
+            "enable_fish_audio_command": ConfigField(type=bool, default=True, description="是否启用Fish Audio TTS Command")
+        },
+        "fish_audio": {
+            "max_retries": ConfigField(type=int, default=3, description="API调用最大重试次数"),
+            "timeout": ConfigField(type=int, default=30, description="API调用超时时间（秒）"),
+            "voice_settings": {
+                "stability": ConfigField(type=float, default=0.5, description="语音稳定性 (0.0-1.0)"),
+                "similarity_boost": ConfigField(type=float, default=0.75, description="相似度提升 (0.0-1.0)"),
+            }
+        },
+        "proxy": {
+            "enabled": ConfigField(type=bool, default=False, description="是否启用代理"),
+            "url": ConfigField(type=str, default="", description="代理URL"),
+        },
+        "logging": {
+            "level": ConfigField(
+                type=str, default="INFO", description="日志记录级别", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+            ),
+            "prefix": ConfigField(type=str, default="[Fish Audio TTS]", description="日志记录前缀"),
+        },
+    }
+
+    def get_plugin_components(self) -> List[Tuple[ComponentInfo, Type]]:
+        """返回插件包含的组件列表"""
+
+        # 从配置获取组件启用状态
+        enable_fish_audio_tts = self.get_config("components.enable_fish_audio_tts", True)
+        enable_fish_audio_command = self.get_config("components.enable_fish_audio_command", True)
+        
+        components = []
+        
+        if enable_fish_audio_tts:
+            components.append((FishAudioAction.get_action_info(), FishAudioAction))
+            
+        if enable_fish_audio_command:
+            components.append((FishAudioCommand.get_command_info(), FishAudioCommand))
+
+        return components 
