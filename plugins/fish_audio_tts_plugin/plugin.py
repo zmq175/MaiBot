@@ -240,19 +240,50 @@ class FishAudioAction(BaseAction):
         
         # Configure session with proxy if needed
         session_kwargs = {}
+        proxy_methods = []
+        
         if self.proxy_url:
-            logger.info(f"Fish Audio TTS: Using proxy: {self.proxy_url}")
-            session_kwargs['proxy'] = self.proxy_url
+            logger.info(f"Fish Audio TTS: Original proxy URL: {self.proxy_url}")
+            # 尝试多种代理配置方式
+            if self.proxy_url.startswith("socks5://"):
+                # 方法1: 直接使用SOCKS5
+                proxy_methods.append(("socks5_direct", self.proxy_url))
+                # 方法2: 转换为HTTP代理
+                http_proxy = self.proxy_url.replace("socks5://", "http://")
+                proxy_methods.append(("http_convert", http_proxy))
+            else:
+                proxy_methods.append(("direct", self.proxy_url))
         else:
-            logger.warning("Fish Audio TTS: No proxy configured, using direct connection")
+            proxy_methods.append(("none", None))
             
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         
         for attempt in range(self.max_retries):
+            # 选择代理方法
+            if attempt < len(proxy_methods):
+                method_name, proxy_url = proxy_methods[attempt]
+            else:
+                # 如果所有代理方法都失败了，尝试直接连接
+                method_name, proxy_url = "direct_none", None
+                
+            session_kwargs = {}
+            if proxy_url:
+                logger.info(f"Fish Audio TTS: Trying proxy method: {method_name} with URL: {proxy_url}")
+                session_kwargs['proxy'] = proxy_url
+                if method_name == "socks5_direct":
+                    # 对于socks5代理，添加额外的连接器配置
+                    session_kwargs['connector'] = aiohttp.TCPConnector(
+                        ssl=False,  # 禁用SSL验证，可能有助于连接
+                        limit=100,
+                        limit_per_host=30
+                    )
+            else:
+                logger.info(f"Fish Audio TTS: Trying direct connection (method: {method_name})")
+                
             try:
                 logger.info(f"Fish Audio TTS: Attempting API call (attempt {attempt + 1}/{self.max_retries})")
                 logger.info(f"Fish Audio TTS: Target URL: {self.api_base_url}/tts")
-                logger.info(f"Fish Audio TTS: Proxy: {self.proxy_url or 'None'}")
+                logger.info(f"Fish Audio TTS: Proxy method: {method_name}")
                 logger.info(f"Fish Audio TTS: Session kwargs: {session_kwargs}")
                 
                 async with aiohttp.ClientSession(
@@ -273,9 +304,11 @@ class FishAudioAction(BaseAction):
                             logger.error(f"Fish Audio TTS API error: {response.status} - {error_text}")
                             
             except asyncio.TimeoutError:
-                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1}")
+                logger.warning(f"Fish Audio TTS: Timeout on attempt {attempt + 1} with method {method_name}")
+            except aiohttp.ServerDisconnectedError as e:
+                logger.error(f"Fish Audio TTS: Server disconnected on attempt {attempt + 1} with method {method_name}: {e}")
             except Exception as e:
-                logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1}: {e}")
+                logger.error(f"Fish Audio TTS: Error on attempt {attempt + 1} with method {method_name}: {e}")
                 logger.error(f"Fish Audio TTS: Error type: {type(e).__name__}")
                 
             if attempt < self.max_retries - 1:
